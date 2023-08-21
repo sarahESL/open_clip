@@ -120,6 +120,7 @@ def create_model(
         cache_dir: Optional[str] = None,
         output_dict: Optional[bool] = None,
         require_pretrained: bool = False,
+        align: bool = False
 ):
     has_hf_hub_prefix = model_name.startswith(HF_HUB_PREFIX)
     if has_hf_hub_prefix:
@@ -155,6 +156,11 @@ def create_model(
         else:
             logging.error(f'Model config for {model_name} not found; available models {list_models()}.')
             raise RuntimeError(f'Model config for {model_name} not found.')
+
+        if align:
+            # align text and vision embeddings through the adaptation layer
+            model_cfg["align"] = True
+            
 
         if force_quick_gelu:
             # override for use of QuickGELU on non-OpenAI transformer models
@@ -304,6 +310,7 @@ def create_model_and_transforms(
         aug_cfg: Optional[Union[Dict[str, Any], AugmentationCfg]] = None,
         cache_dir: Optional[str] = None,
         output_dict: Optional[bool] = None,
+        align: bool = False
 ):
     model = create_model(
         model_name,
@@ -319,6 +326,7 @@ def create_model_and_transforms(
         pretrained_hf=pretrained_hf,
         cache_dir=cache_dir,
         output_dict=output_dict,
+        align=align
     )
 
     image_mean = image_mean or getattr(model.visual, 'image_mean', None)

@@ -26,6 +26,12 @@ class ParseKwargs(argparse.Action):
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--align",
+        action="store_true",
+        default=False,
+        help="If True, adds an adaptation layer to project text and vision embeddings into the same space.",
+    )
+    parser.add_argument(
         "--train-data",
         type=str,
         default=None,

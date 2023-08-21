@@ -196,6 +196,9 @@ def main(args):
         logging.info(
             f'Running in horovod mode with multiple processes / nodes. Device: {args.device}.'
             f'Process (global: {args.rank}, local {args.local_rank}), total {args.world_size}.')
+    if args.align:
+        logging.info(
+            f'Embedding alignment is set.')
     elif args.distributed:
         logging.info(
             f'Running in distributed mode with multiple processes. Device: {args.device}.'
@@ -230,6 +233,7 @@ def main(args):
         image_std=args.image_std,
         aug_cfg=args.aug_cfg,
         output_dict=True,
+        align=args.align
     )
     if args.distill:
         # FIXME: currenlty assumes the model your distilling from has the same tokenizer & transforms.
@@ -239,6 +243,7 @@ def main(args):
             device=device,
             precision=args.precision,
             output_dict=True,
+            align=args.align
         )
     if args.use_bnb_linear is not None:
         print('=> using a layer from bitsandbytes.\n'
