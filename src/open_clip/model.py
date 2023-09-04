@@ -215,7 +215,8 @@ class CLIP(nn.Module):
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
         if align:
-            self.adapter = Adapter(embed_dim, embed_dim)
+            out_dim = int(embed_dim / 2)
+            self.adapter = Adapter(embed_dim, out_dim)
         self.align = align
 
     def lock_image_tower(self, unlocked_groups=0, freeze_bn_stats=False):
