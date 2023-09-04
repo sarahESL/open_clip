@@ -5,6 +5,7 @@ features/
 results/
 
 tests/data/
+*.gif
 *.pt
 
 # Byte-compiled / optimized / DLL files
