@@ -19,6 +19,7 @@ from .timm_model import TimmModel
 from .transformer import LayerNormFp32, LayerNorm, QuickGELU, Attention, VisionTransformer, TextTransformer
 from .utils import to_2tuple
 from .embedding_adapter import Adapter
+from .projection import Projector
 
 
 @dataclass
@@ -209,14 +210,13 @@ class CLIP(nn.Module):
         self.token_embedding = text.token_embedding
         self.positional_embedding = text.positional_embedding
         self.ln_final = text.ln_final
-        self.text_projection = text.text_projection
         self.register_buffer('attn_mask', text.attn_mask, persistent=False)
 
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
-        if align:
-            out_dim = int(embed_dim / 2)
-            self.adapter = Adapter(embed_dim, out_dim)
+        out_dim = embed_dim
+        self.projector = Projector(embed_dim, out_dim)
+        self.text_projection = self.projector.proj
         self.align = align
 
     def lock_image_tower(self, unlocked_groups=0, freeze_bn_stats=False):
@@ -255,8 +255,8 @@ class CLIP(nn.Module):
         text_features = self.encode_text(text, normalize=True) if text is not None else None
 
         if self.align:
-            image_features = self.adapter(image_features)
-            text_features = self.adapter(text_features)
+            image_features = self.projector(image_features)
+            text_features = self.projector(text_features)
 
         if self.output_dict:
             return {

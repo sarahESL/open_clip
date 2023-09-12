@@ -390,7 +390,7 @@ class VisionTransformer(nn.Module):
         else:
             self.attn_pool = None
             self.ln_post = norm_layer(width)
-            self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
+            # self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
         self.init_parameters()
 
@@ -411,7 +411,7 @@ class VisionTransformer(nn.Module):
                     self.transformer.resblocks[-1],
                     self.ln_post,
                 ],
-                self.proj,
+                #self.proj,
             ]
 
             def _unlock(x):
@@ -494,8 +494,8 @@ class VisionTransformer(nn.Module):
             pooled, tokens = self._global_pool(x)
             pooled = self.ln_post(pooled)
 
-        if self.proj is not None:
-            pooled = pooled @ self.proj
+        # if self.proj is not None:
+        #    pooled = pooled @ self.proj
 
         if self.output_tokens:
             return pooled, tokens
@@ -530,7 +530,7 @@ class TextTransformer(nn.Module):
         self.heads = heads
         self.pad_id = pad_id
 
-        self.text_projection = nn.Parameter(torch.empty(width, output_dim))
+        # self.text_projection = nn.Parameter(torch.empty(width, output_dim))
 
         if embed_cls:
             self.cls_emb = nn.Parameter(torch.empty(width))
@@ -569,8 +569,8 @@ class TextTransformer(nn.Module):
             nn.init.normal_(block.mlp.c_fc.weight, std=fc_std)
             nn.init.normal_(block.mlp.c_proj.weight, std=proj_std)
 
-        if self.text_projection is not None:
-            nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
+        # if self.text_projection is not None:
+        #    nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
 
     @torch.jit.ignore
     def set_grad_checkpointing(self, enable=True):
@@ -622,8 +622,8 @@ class TextTransformer(nn.Module):
             x = self.ln_final(x)
             pooled, tokens = x[torch.arange(x.shape[0]), text.argmax(dim=-1)], x
 
-        if self.text_projection is not None:
-            pooled = pooled @ self.text_projection
+        # if self.text_projection is not None:
+        #    pooled = pooled @ self.text_projection
 
         if self.output_tokens:
             return pooled, tokens
