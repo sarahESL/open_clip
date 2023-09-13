@@ -26,6 +26,12 @@ class ParseKwargs(argparse.Action):
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--clip-inModality-loss",
+        action="store_true",
+        default=False,
+        help="If True, calculates the InModality contrastive loss.",
+    )
+    parser.add_argument(
         "--align",
         action="store_true",
         default=False,
