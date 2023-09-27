@@ -322,7 +322,7 @@ class Transformer(nn.Module):
         return x
 
 
-class VisionTransformer(nn.Module):
+class VisionEncoder(nn.Module):
     output_tokens: torch.jit.Final[bool]
 
     def __init__(
@@ -330,18 +330,9 @@ class VisionTransformer(nn.Module):
             image_size: int,
             patch_size: int,
             width: int,
-            layers: int,
-            heads: int,
-            mlp_ratio: float,
-            ls_init_value: float = None,
-            global_average_pool: bool = False,
-            attentional_pool: bool = False,
-            n_queries: int = 256,
-            attn_pooler_heads: int = 8,
             output_dim: int = 512,
             patch_dropout: float = 0.,
             input_patchnorm: bool = False,
-            act_layer: Callable = nn.GELU,
             norm_layer: Callable = LayerNorm,
             output_tokens: bool = False
     ):
@@ -372,25 +363,25 @@ class VisionTransformer(nn.Module):
         self.patch_dropout = PatchDropout(patch_dropout) if patch_dropout > 0. else nn.Identity()
 
         self.ln_pre = norm_layer(width)
-        self.transformer = Transformer(
-            width,
-            layers,
-            heads,
-            mlp_ratio,
-            ls_init_value=ls_init_value,
-            act_layer=act_layer,
-            norm_layer=norm_layer,
-        )
+        # self.transformer = Transformer(
+        #    width,
+        #    layers,
+        #    heads,
+        #    mlp_ratio,
+        #    ls_init_value=ls_init_value,
+        #    act_layer=act_layer,
+        #    norm_layer=norm_layer,
+        #)
 
-        self.global_average_pool = global_average_pool
-        if attentional_pool:
-            self.attn_pool = AttentionalPooler(output_dim, width, n_head=attn_pooler_heads, n_queries=n_queries)
-            self.ln_post = norm_layer(output_dim)
-            self.proj = nn.Parameter(scale * torch.randn(output_dim, output_dim))
-        else:
-            self.attn_pool = None
-            self.ln_post = norm_layer(width)
-            self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
+        #self.global_average_pool = global_average_pool
+        #if attentional_pool:
+        #    self.attn_pool = AttentionalPooler(output_dim, width, n_head=attn_pooler_heads, n_queries=n_queries)
+        #    self.ln_post = norm_layer(output_dim)
+        #    self.proj = nn.Parameter(scale * torch.randn(output_dim, output_dim))
+        #else:
+        #    self.attn_pool = None
+        #    self.ln_post = norm_layer(width)
+        #    self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
         self.init_parameters()
 
@@ -482,28 +473,29 @@ class VisionTransformer(nn.Module):
         x = self.patch_dropout(x)
         x = self.ln_pre(x)
 
-        x = x.permute(1, 0, 2)  # NLD -> LND
-        x = self.transformer(x)
-        x = x.permute(1, 0, 2)  # LND -> NLD
+        # x = x.permute(1, 0, 2)  # NLD -> LND
+        # x = self.transformer(x)
+        # x = x.permute(1, 0, 2)  # LND -> NLD
 
-        if self.attn_pool is not None:
-            x = self.attn_pool(x)
-            x = self.ln_post(x)
-            pooled, tokens = self._global_pool(x)
-        else:
-            pooled, tokens = self._global_pool(x)
-            pooled = self.ln_post(pooled)
+        # if self.attn_pool is not None:
+        #     x = self.attn_pool(x)
+        #    x = self.ln_post(x)
+        #    pooled, tokens = self._global_pool(x)
+        #else:
+        #    pooled, tokens = self._global_pool(x)
+        #    pooled = self.ln_post(pooled)
 
-        if self.proj is not None:
-            pooled = pooled @ self.proj
+        #if self.proj is not None:
+        #    pooled = pooled @ self.proj
 
-        if self.output_tokens:
-            return pooled, tokens
+        #if self.output_tokens:
+        #    return pooled, tokens
         
-        return pooled
+        #return pooled
+        return x
 
 
-class TextTransformer(nn.Module):
+class TextEncoder(nn.Module):
     output_tokens: torch.jit.Final[bool]
 
     def __init__(
@@ -511,15 +503,11 @@ class TextTransformer(nn.Module):
             context_length: int = 77,
             vocab_size: int = 49408,
             width: int = 512,
-            heads: int = 8,
-            layers: int = 12,
-            ls_init_value: float = None,
             output_dim: int = 512,
-            act_layer: Callable = nn.GELU,
-            norm_layer: Callable = LayerNorm,
             embed_cls: bool = False,
             pad_id: int = 0,
             output_tokens: bool = False,
+            cast_dtype: torch.dtype = None,
     ):
         super().__init__()
         self.output_tokens = output_tokens
@@ -527,7 +515,6 @@ class TextTransformer(nn.Module):
         self.vocab_size = vocab_size
         self.width = width
         self.output_dim = output_dim
-        self.heads = heads
         self.pad_id = pad_id
 
         self.text_projection = nn.Parameter(torch.empty(width, output_dim))
@@ -540,17 +527,19 @@ class TextTransformer(nn.Module):
 
         self.token_embedding = nn.Embedding(vocab_size, width)
         self.positional_embedding = nn.Parameter(torch.empty(self.num_pos, width))
-        self.transformer = Transformer(
-            width=width,
-            layers=layers,
-            heads=heads,
-            ls_init_value=ls_init_value,
-            act_layer=act_layer,
-            norm_layer=norm_layer,
-        )
-        self.ln_final = norm_layer(width)
+        #self.transformer = Transformer(
+        #    width=width,
+        #    layers=layers,
+        #    heads=heads,
+        #    ls_init_value=ls_init_value,
+        #    act_layer=act_layer,
+        #    norm_layer=norm_layer,
+        #)
+        #self.ln_final = norm_layer(width)
 
         self.register_buffer('attn_mask', self.build_attention_mask(), persistent=False)
+
+        self.cast_dtype = cast_dtype
 
         self.init_parameters()
 
@@ -560,21 +549,17 @@ class TextTransformer(nn.Module):
         if self.cls_emb is not None:
             nn.init.normal_(self.cls_emb, std=0.01)
 
-        proj_std = (self.transformer.width ** -0.5) * ((2 * self.transformer.layers) ** -0.5)
-        attn_std = self.transformer.width ** -0.5
-        fc_std = (2 * self.transformer.width) ** -0.5
-        for block in self.transformer.resblocks:
-            nn.init.normal_(block.attn.in_proj_weight, std=attn_std)
-            nn.init.normal_(block.attn.out_proj.weight, std=proj_std)
-            nn.init.normal_(block.mlp.c_fc.weight, std=fc_std)
-            nn.init.normal_(block.mlp.c_proj.weight, std=proj_std)
+        # proj_std = (self.transformer.width ** -0.5) * ((2 * self.transformer.layers) ** -0.5)
+        # attn_std = self.transformer.width ** -0.5
+        # fc_std = (2 * self.transformer.width) ** -0.5
+        # for block in self.transformer.resblocks:
+        #    nn.init.normal_(block.attn.in_proj_weight, std=attn_std)
+        #    nn.init.normal_(block.attn.out_proj.weight, std=proj_std)
+        #    nn.init.normal_(block.mlp.c_fc.weight, std=fc_std)
+        #    nn.init.normal_(block.mlp.c_proj.weight, std=proj_std)
 
-        if self.text_projection is not None:
-            nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
-
-    @torch.jit.ignore
-    def set_grad_checkpointing(self, enable=True):
-        self.transformer.grad_checkpointing = enable
+        #if self.text_projection is not None:
+        #    nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
 
     def build_attention_mask(self):
         # lazily create causal attention mask, with full attention between the tokens
@@ -597,7 +582,8 @@ class TextTransformer(nn.Module):
         return t.reshape(1, 1, -1).repeat(N, 1, 1)
 
     def forward(self, text):
-        cast_dtype = self.transformer.get_cast_dtype()
+        # cast_dtype = self.transformer.get_cast_dtype()
+        cast_dtype = self.cast_dtype
         seq_len = text.shape[1]
 
         x = self.token_embedding(text).to(cast_dtype)  # [batch_size, n_ctx, d_model]
@@ -609,26 +595,26 @@ class TextTransformer(nn.Module):
             attn_mask = attn_mask[None, :seq_len, :seq_len] + cls_mask[:, :seq_len, :seq_len]
 
         x = x + self.positional_embedding[:seq_len].to(cast_dtype)
-        x = x.permute(1, 0, 2)  # NLD -> LND
-        x = self.transformer(x, attn_mask=attn_mask)
-        x = x.permute(1, 0, 2)  # LND -> NLD
+        #x = x.permute(1, 0, 2)  # NLD -> LND
+        #x = self.transformer(x, attn_mask=attn_mask)
+        #x = x.permute(1, 0, 2)  # LND -> NLD
 
         # x.shape = [batch_size, n_ctx, transformer.width]
         # take features from the eot embedding (eot_token is the highest number in each sequence)
-        if self.cls_emb is not None:
-            pooled, tokens = x[:, -1], x[:, :-1]
-            pooled = self.ln_final(pooled)
-        else:
-            x = self.ln_final(x)
-            pooled, tokens = x[torch.arange(x.shape[0]), text.argmax(dim=-1)], x
+        #if self.cls_emb is not None:
+        #    pooled, tokens = x[:, -1], x[:, :-1]
+        #    pooled = self.ln_final(pooled)
+        #else:
+        #    x = self.ln_final(x)
+        #    pooled, tokens = x[torch.arange(x.shape[0]), text.argmax(dim=-1)], x
 
-        if self.text_projection is not None:
-            pooled = pooled @ self.text_projection
+        #if self.text_projection is not None:
+        #    pooled = pooled @ self.text_projection
 
-        if self.output_tokens:
-            return pooled, tokens
+        #if self.output_tokens:
+        #    return pooled, tokens
 
-        return pooled
+        return x
 
 
 class MultimodalTransformer(Transformer):

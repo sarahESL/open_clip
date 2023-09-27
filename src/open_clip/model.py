@@ -10,13 +10,13 @@ from typing import Optional, Tuple, Union
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch import nn
+from torch import nn, randn
 from torch.utils.checkpoint import checkpoint
 
 from .hf_model import HFTextEncoder
 from .modified_resnet import ModifiedResNet
 from .timm_model import TimmModel
-from .transformer import LayerNormFp32, LayerNorm, QuickGELU, Attention, VisionTransformer, TextTransformer
+from .transformer import LayerNormFp32, LayerNorm, QuickGELU, Attention, VisionEncoder, TextEncoder, Transformer
 from .utils import to_2tuple
 from .embedding_adapter import Adapter
 
@@ -84,6 +84,13 @@ def get_input_dtype(precision: str):
     return input_dtype
 
 
+def _global_pool(x: torch.Tensor, global_average_pool:bool=False) -> Tuple[torch.Tensor, torch.Tensor]:
+    if global_average_pool:
+        return x.mean(dim=1), x
+    else:
+        return x[:, 0], x[:, 1:]
+        
+
 def _build_vision_tower(
         embed_dim: int,
         vision_cfg: CLIPVisionCfg,
@@ -123,23 +130,14 @@ def _build_vision_tower(
     else:
         vision_heads = vision_cfg.width // vision_cfg.head_width
         norm_layer = LayerNormFp32 if cast_dtype in (torch.float16, torch.bfloat16) else LayerNorm
-        visual = VisionTransformer(
+        visual = VisionEncoder(
             image_size=vision_cfg.image_size,
             patch_size=vision_cfg.patch_size,
             width=vision_cfg.width,
-            layers=vision_cfg.layers,
-            heads=vision_heads,
-            mlp_ratio=vision_cfg.mlp_ratio,
-            ls_init_value=vision_cfg.ls_init_value,
             patch_dropout=vision_cfg.patch_dropout,
             input_patchnorm=vision_cfg.input_patchnorm,
-            global_average_pool=vision_cfg.global_average_pool,
-            attentional_pool=vision_cfg.attentional_pool,
-            n_queries=vision_cfg.n_queries,
-            attn_pooler_heads=vision_cfg.attn_pooler_heads,
             output_tokens=vision_cfg.output_tokens,
             output_dim=embed_dim,
-            act_layer=act_layer,
             norm_layer=norm_layer,
         )
 
@@ -165,22 +163,15 @@ def _build_text_tower(
             output_tokens=text_cfg.output_tokens,
         )
     else:
-        act_layer = QuickGELU if quick_gelu else nn.GELU
-        norm_layer = LayerNormFp32 if cast_dtype in (torch.float16, torch.bfloat16) else LayerNorm
-
-        text = TextTransformer(
+        text = TextEncoder(
             context_length=text_cfg.context_length,
             vocab_size=text_cfg.vocab_size,
             width=text_cfg.width,
-            heads=text_cfg.heads,
-            layers=text_cfg.layers,
-            ls_init_value=text_cfg.ls_init_value,
             output_dim=embed_dim,
             embed_cls=text_cfg.embed_cls,
             output_tokens=text_cfg.output_tokens,
             pad_id=text_cfg.pad_id,
-            act_layer=act_layer,
-            norm_layer=norm_layer,
+            cast_dtype=cast_dtype
         )
     return text
 
@@ -200,24 +191,63 @@ class CLIP(nn.Module):
     ):
         super().__init__()
         self.output_dict = output_dict
+        
+        if isinstance(text_cfg, dict):
+            text_cfg = CLIPTextCfg(**text_cfg)
+        if isinstance(vision_cfg, dict):
+            vision_cfg = CLIPVisionCfg(**vision_cfg)
+
+        # self.transformer = text.transformer
+        assert vision_cfg.width == text_cfg.width
+        assert vision_cfg.layers == text_cfg.layers
+        vision_heads = vision_cfg.width // vision_cfg.head_width
+        assert vision_heads == text_cfg.heads
+        assert vision_cfg.ls_init_value == text_cfg.ls_init_value
+        
+        act_layer = QuickGELU if quick_gelu else nn.GELU
+        norm_layer = LayerNormFp32 if cast_dtype in (torch.float16, torch.bfloat16) else LayerNorm
+        self.ln_post = norm_layer(vision_cfg.width)
+        
+        self.transformer = Transformer(
+            vision_cfg.width,
+            vision_cfg.layers,
+            text_cfg.heads,
+            vision_cfg.mlp_ratio,
+            ls_init_value=text_cfg.ls_init_value,
+            act_layer=act_layer,
+            norm_layer=norm_layer,
+        )
+        
+        cast_dtype = self.transformer.get_cast_dtype()
+
         self.visual = _build_vision_tower(embed_dim, vision_cfg, quick_gelu, cast_dtype)
 
-        text = _build_text_tower(embed_dim, text_cfg, quick_gelu, cast_dtype)
-        self.transformer = text.transformer
-        self.context_length = text.context_length
-        self.vocab_size = text.vocab_size
-        self.token_embedding = text.token_embedding
-        self.positional_embedding = text.positional_embedding
-        self.ln_final = text.ln_final
-        self.text_projection = text.text_projection
-        self.register_buffer('attn_mask', text.attn_mask, persistent=False)
+        self.text = _build_text_tower(embed_dim, text_cfg, quick_gelu, cast_dtype)
+
+        scale = vision_cfg.width ** -0.5
+        self.projection = nn.Parameter(scale * randn(vision_cfg.width, embed_dim))
+
+        #self.context_length = text.context_length
+        #self.vocab_size = text.vocab_size
+        #self.token_embedding = text.token_embedding
+        #self.positional_embedding = text.positional_embedding
+        #self.ln_final = text.ln_final
+        #self.text_projection = text.text_projection
+        self.register_buffer('attn_mask', self.text.attn_mask, persistent=False)
 
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+        self.init_parameters()
 
-        if align:
-            out_dim = int(embed_dim / 2)
-            self.adapter = Adapter(embed_dim, out_dim)
-        self.align = align
+    def init_parameters(self):
+        proj_std = (self.transformer.width ** -0.5) * ((2 * self.transformer.layers) ** -0.5)
+        attn_std = self.transformer.width ** -0.5
+        fc_std = (2 * self.transformer.width) ** -0.5
+        for block in self.transformer.resblocks:
+            nn.init.normal_(block.attn.in_proj_weight, std=attn_std)
+            nn.init.normal_(block.attn.out_proj.weight, std=proj_std)
+            nn.init.normal_(block.mlp.c_fc.weight, std=fc_std)
+            nn.init.normal_(block.mlp.c_proj.weight, std=proj_std)
+        nn.init.normal_(self.projection, std=self.transformer.width ** -0.5)
 
     def lock_image_tower(self, unlocked_groups=0, freeze_bn_stats=False):
         # lock image tower as per LiT - https://arxiv.org/abs/2111.07991
@@ -229,21 +259,29 @@ class CLIP(nn.Module):
         self.transformer.grad_checkpointing = enable
 
     def encode_image(self, image, normalize: bool = False):
-        features = self.visual(image)
+        x = self.visual(image)
+        x = x.permute(1, 0, 2)  # NLD -> LND
+        x = self.transformer(x)
+        x = x.permute(1, 0, 2)  # LND -> NLD
+        pooled, tokens = _global_pool(x)
+        features = self.ln_post(pooled)
+        features = features @ self.projection
+
         return F.normalize(features, dim=-1) if normalize else features
 
     def encode_text(self, text, normalize: bool = False):
-        cast_dtype = self.transformer.get_cast_dtype()
 
-        x = self.token_embedding(text).to(cast_dtype)  # [batch_size, n_ctx, d_model]
+        # x = self.token_embedding(text).to(cast_dtype)  # [batch_size, n_ctx, d_model]
 
-        x = x + self.positional_embedding.to(cast_dtype)
+        # x = x + self.positional_embedding.to(cast_dtype)
+        x = self.text(text)
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x, attn_mask=self.attn_mask)
         x = x.permute(1, 0, 2)  # LND -> NLD
-        x = self.ln_final(x)  # [batch_size, n_ctx, transformer.width]
+        x = self.ln_post(x)
+        #x = self.ln_final(x)  # [batch_size, n_ctx, transformer.width]
         # take features from the eot embedding (eot_token is the highest number in each sequence)
-        x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+        x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.projection
         return F.normalize(x, dim=-1) if normalize else x
 
     def forward(
@@ -253,10 +291,6 @@ class CLIP(nn.Module):
     ):
         image_features = self.encode_image(image, normalize=True) if image is not None else None
         text_features = self.encode_text(text, normalize=True) if text is not None else None
-
-        if self.align:
-            image_features = self.adapter(image_features)
-            text_features = self.adapter(text_features)
 
         if self.output_dict:
             return {
