@@ -335,6 +335,7 @@ def evaluate(model, data, epoch, args, tb_writer=None):
 
 
 def get_clip_metrics(image_features, text_features, logit_scale):
+
     metrics = {}
     logits_per_image = (logit_scale * image_features @ text_features.t()).detach().cpu()
     logits_per_text = logits_per_image.t().detach().cpu()
@@ -350,7 +351,17 @@ def get_clip_metrics(image_features, text_features, logit_scale):
         metrics[f"{name}_median_rank"] = np.floor(np.median(preds)) + 1
         for k in [1, 5, 10]:
             metrics[f"{name}_R@{k}"] = np.mean(preds < k)
+    
+    # image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+    # text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    # inner_product = image_features @ text_features.T
+    # alignment_score = inner_product.diagonal().mean()  # the higher, the better
+    # inner_product.diagonal(dim1=-1, dim2=-2).zero_()  # making the diagonal zero
+    # separation_score = 1 - inner_product.mean()  # the higher, the better
 
+    # metrics['alignment_score'] = alignment_score.cpu().detach().numpy()
+    # metrics['separation_loss'] = separation_score.cpu().detach().numpy()
+    
     return metrics
 
 
