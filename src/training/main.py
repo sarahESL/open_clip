@@ -98,6 +98,9 @@ def main(args):
             f"p_{args.precision}",
         ])
 
+        if args.clip_inModality_loss and args.clip_loss:
+            args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"beta_{args.beta}"])
+
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
     args.log_path = None
