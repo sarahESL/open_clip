@@ -138,13 +138,16 @@ class ClipInModalityLoss(nn.Module):
     def __init__(
             self,
             local_loss=False,
+            adaptive=False,
             gather_with_grad=False,
             cache_labels=False,
             rank=0,
             world_size=1,
             use_horovod=False,
             alpha=1.0,
-            beta=0.5
+            beta=0.5,
+            n_epoch=30,
+            epoch=1
     ):
         super().__init__()
         self.local_loss = local_loss
@@ -157,8 +160,12 @@ class ClipInModalityLoss(nn.Module):
         # cache state
         self.prev_num_logits = 0
         self.labels = {}
-        self.alpha = alpha
-        self.beta = beta
+        if adaptive:
+            self.alpha = (epoch/n_epoch)**2
+            self.beta = 1 - self.alpha
+        else:
+            self.alpha = alpha
+            self.beta = beta
 
     def get_ground_truth(self, device, num_logits) -> torch.Tensor:
         # calculated ground-truth and cache if enabled

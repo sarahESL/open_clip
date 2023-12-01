@@ -262,7 +262,7 @@ def create_model(
     return model
 
 
-def create_loss(args):
+def create_loss(args, epoch):
     if args.distill:
         return DistillClipLoss(
             local_loss=args.local_loss,
@@ -286,13 +286,16 @@ def create_loss(args):
     elif args.clip_inModality_loss and args.clip_loss:
         return ClipInModalityLoss(
                 local_loss=args.local_loss,
+                adaptive=args.adaptive,
                 gather_with_grad=args.gather_with_grad,
                 cache_labels=True,
                 rank=args.rank,
                 world_size=args.world_size,
                 use_horovod=args.horovod,
                 alpha=args.alpha,
-                beta=args.beta
+                beta=args.beta,
+                n_epoch=args.epochs,
+                epoch=epoch
                 )
 
     return ClipLoss(

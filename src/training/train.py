@@ -309,6 +309,9 @@ def evaluate(model, data, epoch, args, tb_writer=None):
                 gen_loss = cumulative_gen_loss / num_samples
                 metrics.update({"val_generative_loss": gen_loss.item()})
 
+    alpha = (epoch/args.epochs)**2
+    metrics.update({"alpha": alpha})
+
     if not metrics:
         return metrics
 
