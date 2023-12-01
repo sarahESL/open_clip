@@ -32,6 +32,12 @@ def parse_args(args):
         help="If True, calculates the InModality contrastive loss.",
         )
     parser.add_argument(
+        "--adaptive",
+        action="store_true",
+        default=False,
+        help="If True, calculates the InModality contrastive loss with adaptive learning.",
+        )
+    parser.add_argument(
         "--clip-loss",
         action="store_true",
         default=True,

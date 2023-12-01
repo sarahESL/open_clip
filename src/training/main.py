@@ -99,7 +99,10 @@ def main(args):
         ])
 
         if args.clip_inModality_loss and args.clip_loss:
-            args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"beta_{args.beta}"])
+            if args.adaptive:
+                args.name = '-'.join([args.name, "alpha_beta_adaptive"])
+            else:
+                args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"beta_{args.beta}"])
 
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
@@ -417,9 +420,9 @@ def main(args):
         evaluate(model, data, start_epoch, args, writer)
         return
 
-    loss = create_loss(args)
 
     for epoch in range(start_epoch, args.epochs):
+        loss = create_loss(args, epoch)
         if is_master(args):
             logging.info(f'Start epoch {epoch}')
 
