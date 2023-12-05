@@ -50,6 +50,12 @@ def parse_args(args):
         help="If True, adds an adaptation layer to project text and vision embeddings into the same space.",
     )
     parser.add_argument(
+        "--nl_semantic_supervision",
+        action="store_true",
+        default=False,
+        help="If True, uses pre-trained sentence embeddings to supervise the text embeddings."
+    )
+    parser.add_argument(
         "--train-data",
         type=str,
         default=None,
@@ -157,9 +163,14 @@ def parse_args(args):
         help="When scheduler w/ cooldown used, perform cooldown from total_epochs - cooldown_epochs onwards."
     )
     parser.add_argument(
-        "--alpha", type=float, default=1.0, help="Weight of the clips loss.")
+        "--alpha", type=float, default=1.0, help="Weight of the clips loss."
+    )
     parser.add_argument(
-        "--beta", type=float, default=0.5, help="Weight of the inModality constrastive loss.")
+        "--beta", type=float, default=0.5, help="Weight of the inModality constrastive loss."
+    )
+    parser.add_argument(
+        "--semantic_weight", type=float, default=1.0, help="Weight of the semantic loss when with nl eupervision."
+    )
     parser.add_argument("--lr", type=float, default=None, help="Learning rate.")
     parser.add_argument("--beta1", type=float, default=None, help="Adam beta 1.")
     parser.add_argument("--beta2", type=float, default=None, help="Adam beta 2.")

@@ -305,6 +305,9 @@ def create_loss(args, epoch):
         rank=args.rank,
         world_size=args.world_size,
         use_horovod=args.horovod,
+        alpha=args.alpha,
+        nl_semantic_supervision=args.nl_semantic_supervision,
+        semantic_weight=args.semantic_weight
     )
 
 
