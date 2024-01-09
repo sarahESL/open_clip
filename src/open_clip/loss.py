@@ -138,12 +138,19 @@ class ClipLoss(nn.Module):
             F.cross_entropy(logits_per_text, labels)
         )/2)
         if self.nl_semantic_supervision:
-            semantic_loss = self.semantic_weight*(F.mse_loss(text_features, semantic_features))
+            semantic_loss = 0
+            for i in range(text_features.shape[0]):
+                in_clip_distance = text_features - text_features[i]
+                in_semantic_distance = semantic_features - semantic_features[i]
+                intermediate_semantic_loss = F.mse_loss(in_clip_distance, in_semantic_distance)
+                semantic_loss = semantic_loss + intermediate_semantic_loss
+            semantic_loss = semantic_loss / text_features.shape[0]
+            semantic_loss = self.semantic_weight * semantic_loss
             total_loss = clip_loss + semantic_loss
+            return {"contrastive_loss": total_loss, "clip_loss": clip_loss, "semantic_loss": semantic_loss} if output_dict else total_loss
         else:
             total_loss = clip_loss
-
-        return {"contrastive_loss": total_loss} if output_dict else total_loss
+            return {"contrastive_loss": total_loss} if output_dict else total_loss
 
 
 class ClipInModalityLoss(nn.Module):
