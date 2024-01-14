@@ -56,6 +56,12 @@ def parse_args(args):
         help="If True, uses pre-trained sentence embeddings to supervise the text embeddings."
     )
     parser.add_argument(
+        "--semantic_pairwise",
+        action="store_true",
+        default=False,
+        help="If True, uses pairwise distance of text embeddings for loss function."
+    )
+    parser.add_argument(
         "--train-data",
         type=str,
         default=None,

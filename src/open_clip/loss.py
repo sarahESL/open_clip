@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import numpy as np
 
 try:
     import torch.distributed.nn
@@ -75,7 +76,8 @@ class ClipLoss(nn.Module):
             use_horovod=False,
             alpha=1.0,
             nl_semantic_supervision=False,
-            semantic_weight=1.0
+            semantic_weight=1.0,
+            semantic_pairwise=True
     ):
         super().__init__()
         self.local_loss = local_loss
@@ -92,6 +94,7 @@ class ClipLoss(nn.Module):
 
         # Natural Language Semantic Supervision
         self.nl_semantic_supervision = nl_semantic_supervision
+        self.semantic_pairwise = semantic_pairwise
 
         if nl_semantic_supervision:
             self.semantic_weight = semantic_weight
@@ -138,16 +141,20 @@ class ClipLoss(nn.Module):
             F.cross_entropy(logits_per_text, labels)
         )/2)
         if self.nl_semantic_supervision:
-            semantic_loss = 0
-            for i in range(text_features.shape[0]):
-                in_clip_distance = text_features - text_features[i]
-                in_semantic_distance = semantic_features - semantic_features[i]
-                intermediate_semantic_loss = F.mse_loss(in_clip_distance, in_semantic_distance)
-                semantic_loss = semantic_loss + intermediate_semantic_loss
-            semantic_loss = semantic_loss / text_features.shape[0]
-            semantic_loss = self.semantic_weight * semantic_loss
+            if self.semantic_pairwise:
+                semantic_loss = 0
+                for i in range(text_features.shape[0]):
+                    in_clip_distance = text_features - text_features[i]
+                    in_semantic_distance = semantic_features - semantic_features[i]
+                    intermediate_semantic_loss = F.mse_loss(in_clip_distance, in_semantic_distance)
+                    semantic_loss = semantic_loss + intermediate_semantic_loss
+                semantic_loss = semantic_loss / text_features.shape[0]
+                semantic_loss = self.semantic_weight * semantic_loss
+            else:
+                semantic_loss = self.semantic_weight*(F.mse_loss(text_features, semantic_features))
+            
             total_loss = clip_loss + semantic_loss
-            return {"contrastive_loss": total_loss, "clip_loss": clip_loss, "semantic_loss": semantic_loss} if output_dict else total_loss
+            return {"total_loss": total_loss, "clip_loss": clip_loss, "semantic_loss": semantic_loss} if output_dict else total_loss
         else:
             total_loss = clip_loss
             return {"contrastive_loss": total_loss} if output_dict else total_loss
@@ -167,7 +174,9 @@ class ClipInModalityLoss(nn.Module):
             alpha=1.0,
             beta=0.5,
             n_epoch=30,
-            epoch=1
+            epoch=1,
+            nl_semantic_supervision=False,
+            semantic_weight=1.0
     ):
         super().__init__()
         self.local_loss = local_loss
@@ -186,6 +195,11 @@ class ClipInModalityLoss(nn.Module):
         else:
             self.alpha = alpha
             self.beta = beta
+        
+        self.nl_semantic_supervision = nl_semantic_supervision
+
+        if nl_semantic_supervision:
+            self.semantic_weight = semantic_weight
 
     def get_ground_truth(self, device, num_logits) -> torch.Tensor:
         # calculated ground-truth and cache if enabled
@@ -246,16 +260,33 @@ class ClipInModalityLoss(nn.Module):
         
         return logits_per_image, logits_per_text, logscale_logits_image_text, logscale_logits_text_image
 
-    def forward(self, image_features, text_features, logit_scale, output_dict=False):
+    def forward(self, image_features, text_features, logit_scale, output_dict=False, semantic_features=None):
         device = image_features.device
         logits_per_image, logits_per_text, logscale_logits_image_text, logscale_logits_text_image = self.get_logits(image_features, text_features, logit_scale)
 
         labels = self.get_ground_truth(device, logits_per_image.shape[0])
 
-        inModality_loss = self.beta*((
-            F.cross_entropy(logits_per_image, labels) +
-            F.cross_entropy(logits_per_text, labels)
-        )/2)
+        if self.nl_semantic_supervision:
+
+            semantic_features = semantic_features / semantic_features.norm(dim=-1, keepdim=True)
+            semantic_sim = semantic_features @ semantic_features.T
+            semantic_sim = 1 - semantic_sim
+
+            size = logits_per_image.shape[0]
+
+            logits_per_text = torch.mul(logits_per_text, semantic_sim)
+            device = logits_per_image.get_device()
+
+            logits_paired_text_image = torch.mul(logits_per_image, torch.eye(size).to(device))
+
+            logits_per_text = logits_per_text + logits_paired_text_image
+
+            inModality_loss = self.beta*((F.cross_entropy(logits_per_text, labels)))
+        else:
+            inModality_loss = self.beta*((
+                F.cross_entropy(logits_per_image, labels) +
+                F.cross_entropy(logits_per_text, labels)
+                )/2)
         
         clip_loss = self.alpha*((
             F.cross_entropy(logscale_logits_image_text, labels) +
@@ -263,8 +294,7 @@ class ClipInModalityLoss(nn.Module):
         )/2)
 
         total_loss = inModality_loss + clip_loss
-
-        return {"contrastive_loss": total_loss} if output_dict else total_loss
+        return {"total_loss": total_loss, "clip_loss": clip_loss, "inModality_loss": inModality_loss} if output_dict else total_loss
 
 
 class CoCaLoss(ClipLoss):

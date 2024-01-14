@@ -106,7 +106,7 @@ def main(args):
             else:
                 args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"beta_{args.beta}"])
         if args.nl_semantic_supervision:
-            args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}"])
+            args.name = '-'.join([args.name, f"pairwise_{args.semantic_pairwise}", f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}"])
 
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
