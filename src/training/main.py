@@ -105,7 +105,9 @@ def main(args):
                 args.name = '-'.join([args.name, "alpha_beta_adaptive"])
             else:
                 args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"beta_{args.beta}"])
-        if args.nl_semantic_supervision:
+        if args.nl_semantic_supervision and args.rescale_clip:
+            args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}", f"rescaleCLIP_{args.rescale_clip}"])
+        elif args.nl_semantic_supervision:
             args.name = '-'.join([args.name, f"pairwise_{args.semantic_pairwise}", f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}"])
 
     resume_latest = args.resume == 'latest'

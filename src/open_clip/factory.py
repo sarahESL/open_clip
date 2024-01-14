@@ -297,7 +297,8 @@ def create_loss(args, epoch):
                 n_epoch=args.epochs,
                 epoch=epoch,
                 nl_semantic_supervision=args.nl_semantic_supervision,
-                semantic_weight=args.semantic_weight
+                semantic_weight=args.semantic_weight,
+                rescale_clip=args.rescale_clip
                 )
 
     return ClipLoss(

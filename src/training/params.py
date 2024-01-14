@@ -62,6 +62,12 @@ def parse_args(args):
         help="If True, uses pairwise distance of text embeddings for loss function."
     )
     parser.add_argument(
+        "--rescale_clip",
+        action="store_true",
+        default=False,
+        help="If True, rescales the I.T and T.I logits by T.T sbert similarities. ."
+    )
+    parser.add_argument(
         "--train-data",
         type=str,
         default=None,

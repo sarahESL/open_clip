@@ -176,7 +176,8 @@ class ClipInModalityLoss(nn.Module):
             n_epoch=30,
             epoch=1,
             nl_semantic_supervision=False,
-            semantic_weight=1.0
+            semantic_weight=1.0,
+            rescale_clip=False
     ):
         super().__init__()
         self.local_loss = local_loss
@@ -197,6 +198,7 @@ class ClipInModalityLoss(nn.Module):
             self.beta = beta
         
         self.nl_semantic_supervision = nl_semantic_supervision
+        self.rescale_clip = rescale_clip
 
         if nl_semantic_supervision:
             self.semantic_weight = semantic_weight
@@ -282,6 +284,14 @@ class ClipInModalityLoss(nn.Module):
             logits_per_text = logits_per_text + logits_paired_text_image
 
             inModality_loss = self.beta*((F.cross_entropy(logits_per_text, labels)))
+
+            if self.rescale_clip:
+                logscale_logits_text_image = torch.mul(logscale_logits_text_image, semantic_sim)
+                logscale_logits_text_image =  logscale_logits_text_image + logits_paired_text_image
+
+                logscale_logits_image_text = torch.mul(logscale_logits_image_text, semantic_sim)
+                logscale_logits_image_text =  logscale_logits_image_text + logits_paired_text_image
+
         else:
             inModality_loss = self.beta*((
                 F.cross_entropy(logits_per_image, labels) +
@@ -292,6 +302,7 @@ class ClipInModalityLoss(nn.Module):
             F.cross_entropy(logscale_logits_image_text, labels) +
             F.cross_entropy(logscale_logits_text_image, labels)
         )/2)
+
 
         total_loss = inModality_loss + clip_loss
         return {"total_loss": total_loss, "clip_loss": clip_loss, "inModality_loss": inModality_loss} if output_dict else total_loss
