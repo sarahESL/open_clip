@@ -62,6 +62,18 @@ def parse_args(args):
         help="If True, uses pairwise distance of text embeddings for loss function."
     )
     parser.add_argument(
+        "--separate_text",
+        action="store_true",
+        default=False,
+        help="If True, does the T.T separation ."
+    )
+    parser.add_argument(
+        "--separate_image",
+        action="store_true",
+        default=False,
+        help="If True, does the I.I separation ."
+    )
+    parser.add_argument(
         "--rescale_clip",
         action="store_true",
         default=False,

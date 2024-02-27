@@ -177,7 +177,9 @@ class ClipInModalityLoss(nn.Module):
             epoch=1,
             nl_semantic_supervision=False,
             semantic_weight=1.0,
-            rescale_clip=False
+            rescale_clip=False,
+            separate_text=True,
+            separate_image=False
     ):
         super().__init__()
         self.local_loss = local_loss
@@ -199,6 +201,8 @@ class ClipInModalityLoss(nn.Module):
         
         self.nl_semantic_supervision = nl_semantic_supervision
         self.rescale_clip = rescale_clip
+        self.separate_text = separate_text
+        self.separate_image = separate_image
 
         if nl_semantic_supervision:
             self.semantic_weight = semantic_weight
@@ -250,21 +254,21 @@ class ClipInModalityLoss(nn.Module):
             logscale_logits_image_text = logit_scale * image_features @ text_features.T
             logscale_logits_text_image = logit_scale * text_features @ image_features.T
         
-        device = logits_per_image.get_device()
-        identity_complement = 1 - torch.eye(size).to(device)
+        # device = logits_per_image.get_device()
+        # identity_complement = 1 - torch.eye(size).to(device)
 
-        paired_logits_image_text = torch.mul(torch.eye(size).to(device), logits_image_text)                
-        paired_logits_image_text = identity_complement + paired_logits_image_text
+        # paired_logits_image_text = torch.mul(torch.eye(size).to(device), logits_image_text)                
+        # paired_logits_image_text = identity_complement + paired_logits_image_text
 
-        logits_per_image = logit_scale * torch.mul(logits_per_image, paired_logits_image_text)
+        # logits_per_image = logit_scale * torch.mul(logits_per_image, paired_logits_image_text)
 
-        logits_per_text = logit_scale * torch.mul(logits_per_text, paired_logits_image_text)
+        # logits_per_text = logit_scale * torch.mul(logits_per_text, paired_logits_image_text)
         
-        return logits_per_image, logits_per_text, logscale_logits_image_text, logscale_logits_text_image
+        return logits_per_image, logits_per_text, logits_image_text, logscale_logits_image_text, logscale_logits_text_image
 
     def forward(self, image_features, text_features, logit_scale, output_dict=False, semantic_features=None):
         device = image_features.device
-        logits_per_image, logits_per_text, logscale_logits_image_text, logscale_logits_text_image = self.get_logits(image_features, text_features, logit_scale)
+        logits_per_image, logits_per_text, logits_image_text, logscale_logits_image_text, logscale_logits_text_image = self.get_logits(image_features, text_features, logit_scale)
 
         labels = self.get_ground_truth(device, logits_per_image.shape[0])
 
@@ -274,16 +278,29 @@ class ClipInModalityLoss(nn.Module):
             semantic_sim = semantic_features @ semantic_features.T
             semantic_sim = 1 - semantic_sim
 
-            size = logits_per_image.shape[0]
-
-            logits_per_text = torch.mul(logits_per_text, semantic_sim)
             device = logits_per_image.get_device()
 
-            logits_paired_text_image = torch.mul(logits_per_image, torch.eye(size).to(device))
+            size = logits_per_image.shape[0]
 
-            logits_per_text = logits_per_text + logits_paired_text_image
+            logits_paired_text_image = torch.mul(logits_image_text, torch.eye(size).to(device))
 
-            inModality_loss = self.beta*((F.cross_entropy(logits_per_text, labels)))
+            if self.separate_text:
+                logits_per_text = torch.mul(logits_per_text, semantic_sim)
+                logits_per_text = logits_per_text + logits_paired_text_image
+                logscale_logits_per_text = logit_scale * logits_per_text
+
+            if self.separate_image:
+                logits_per_image = torch.mul(logits_per_image, semantic_sim)
+                logits_per_image = logits_per_image + logits_paired_text_image
+                logscale_logits_per_image = logit_scale * logits_per_image
+
+            if self.separate_text and self.separate_image:
+                inModality_loss = self.beta*(F.cross_entropy(logscale_logits_per_text, labels) +
+                        F.cross_entropy(logscale_logits_per_image, labels))
+            elif self.separate_text:
+                inModality_loss = self.beta*(F.cross_entropy(logscale_logits_per_text, labels))
+            elif self.separate_image:
+                inModality_loss = self.beta*(F.cross_entropy(logscale_logits_per_image, labels))
 
             if self.rescale_clip:
                 logscale_logits_text_image = torch.mul(logscale_logits_text_image, semantic_sim)
@@ -300,8 +317,7 @@ class ClipInModalityLoss(nn.Module):
         
         clip_loss = self.alpha*((
             F.cross_entropy(logscale_logits_image_text, labels) +
-            F.cross_entropy(logscale_logits_text_image, labels)
-        )/2)
+            F.cross_entropy(logscale_logits_text_image, labels)))
 
 
         total_loss = inModality_loss + clip_loss
