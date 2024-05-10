@@ -12,12 +12,13 @@ IMAGENET="/home/sedigheh.eslami/datasets/imagenet_1k"
 IMAGENETV2="/home/sedigheh.eslami/datasets/cc12m"
 PROJECT_NAME=open_clip_sharedParams_withInModality_CC12M_kisz
 #PROJECT_NAME=open_clip_sharedParams_withInModality_CC12M_kisz_distributed
-ALPHA=0.5
-BETA=1.0
+ALPHA=1
+BETA=0.25
 
 wandb login $(cat ~/.wandb_secret)
 
-#python -m training.main --logs=$OUTPATH --save-frequency 2 --zeroshot-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --clip-inModality-loss --clip-loss --alpha=$ALPHA --beta=$BETA --nl_semantic_supervision --train-num-samples 10030127 --dataset-type webdataset --separate_text --separate_image
-python -m training.main --logs=$OUTPATH --save-frequency 2 --zeroshot-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --clip-inModality-loss --clip-loss --alpha=$ALPHA --beta=$BETA --nl_semantic_supervision --train-num-samples 10030127 --dataset-type webdataset --separate_text
+python -m training.main --logs=$OUTPATH --save-frequency 2 --zeroshot-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --clip-inModality-loss --clip-loss --alpha=$ALPHA --beta=$BETA --nl_semantic_supervision --train-num-samples 10030127 --dataset-type webdataset --separate_text --separate_image
+#python -m training.main --logs=$OUTPATH --save-frequency 2 --zeroshot-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --clip-inModality-loss --clip-loss --alpha=$ALPHA --beta=$BETA --nl_semantic_supervision --train-num-samples 10030127 --dataset-type webdataset --separate_text --resume "/home/sedigheh.eslami/outputs/alignCLIP_openCLIP/shared_transformer_projector_withInModality/logs/2024_02_26-10_57_28-model_ViT-L-16-lr_0.001-b_512-j_2-p_amp-alpha_0.5-beta_0.5-pairwise_False-alpha_0.5-semantic_1.0/checkpoints/epoch_4.pt"
+#python -m training.main --logs=$OUTPATH --save-frequency 2 --zeroshot-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --clip-inModality-loss --clip-loss --alpha=$ALPHA --beta=$BETA --nl_semantic_supervision --train-num-samples 10030127 --dataset-type webdataset --separate_text --separate_image --resume "/home/sedigheh.eslami/outputs/alignCLIP_openCLIP/shared_transformer_projector_withInModality/logs/2024_02_26-10_57_28-model_ViT-L-16-lr_0.001-b_512-j_2-p_amp-alpha_0.5-beta_0.5-pairwise_False-alpha_0.5-semantic_1.0/checkpoints/epoch_4.pt"
 
 #torchrun --nproc_per_node 1 -m training.main --logs=$OUTPATH --save-frequency 2  --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --clip-inModality-loss --clip-loss --alpha=$ALPHA --beta=$BETA --nl_semantic_supervision --train-num-samples 10030127 --dataset-type webdataset --accum-freq 2 --grad-checkpointing --gather-with-grad
