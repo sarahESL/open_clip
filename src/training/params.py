@@ -26,6 +26,24 @@ class ParseKwargs(argparse.Action):
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
+            "--nl_semantic_supervision",
+            action="store_true",
+            default=False,
+            help="If True, uses pre-trained sentence embeddings to supervise the text embeddings."
+            )
+    parser.add_argument(
+            "--clip-inModality-loss",
+            action="store_true",
+            default=False,
+            help="If True, calculates the InModality contrastive loss.",
+            )
+    parser.add_argument(
+            "--clip-loss",
+            action="store_true",
+            default=True,
+            help="If True, calculates the clip contrastive loss.",
+            )
+    parser.add_argument(
         "--align",
         action="store_true",
         default=False,
@@ -138,6 +156,10 @@ def parse_args(args):
         "--epochs-cooldown", type=int, default=None,
         help="When scheduler w/ cooldown used, perform cooldown from total_epochs - cooldown_epochs onwards."
     )
+    parser.add_argument(
+            "--alpha", type=float, default=1.0, help="Weight of the cross-separation loss.")
+    parser.add_argument(
+            "--beta", type=float, default=0.5, help="Weight of the in-modality separation loss.")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate.")
     parser.add_argument("--beta1", type=float, default=None, help="Adam beta 1.")
     parser.add_argument("--beta2", type=float, default=None, help="Adam beta 2.")

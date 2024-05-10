@@ -35,6 +35,7 @@ from training.params import parse_args
 from training.scheduler import cosine_lr, const_lr, const_lr_cooldown
 from training.train import train_one_epoch, evaluate
 from training.file_utils import pt_load, check_exists, start_sync_process, remote_sync
+from sentence_transformers import SentenceTransformer as SBERT
 
 
 LATEST_CHECKPOINT_NAME = "epoch_latest.pt"
@@ -97,6 +98,12 @@ def main(args):
             f"j_{args.workers}",
             f"p_{args.precision}",
         ])
+
+        if args.clip_inModality_loss and args.clip_loss:
+            if args.nl_semantic_supervision:
+                args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"beta_{args.beta}", "with_semantic_supervision"])
+            else:
+                args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"beta_{args.beta}"])
 
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
@@ -350,7 +357,7 @@ def main(args):
             logging.info(f"=> loaded checkpoint '{args.resume}' (epoch {start_epoch})")
 
     # initialize datasets
-    data = get_data(args, (preprocess_train, preprocess_val), epoch=start_epoch, tokenizer=get_tokenizer(args.model))
+    data = get_data(args, (preprocess_train, preprocess_val), epoch=start_epoch, tokenizer=get_tokenizer(args.model), with_nl_semantic_supervision=args.nl_semantic_supervision)
     assert len(data), 'At least one train or eval dataset must be specified.'
 
     # create scheduler if train
@@ -405,13 +412,19 @@ def main(args):
         logging.info('Compiling model...')
         model = torch.compile(model)
 
+    if args.nl_semantic_supervision:
+                sbert = SBERT('all-mpnet-base-v2')
+
     if 'train' not in data:
         # If using int8, convert to inference mode.
         if args.use_bnb_linear is not None:
             from open_clip.utils import convert_int8_model_to_inference_mode
             convert_int8_model_to_inference_mode(model)
         # Evaluate.
-        evaluate(model, data, start_epoch, args, writer)
+        if args.nl_semantic_supervision:
+            evaluate(model, data, loss, start_epoch, args, writer, sbert)
+        else:
+            evaluate(model, data, start_epoch, args, writer)
         return
 
     loss = create_loss(args)
@@ -420,11 +433,17 @@ def main(args):
         if is_master(args):
             logging.info(f'Start epoch {epoch}')
 
-        train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
+        if args.nl_semantic_supervision:
+            train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer, sbert=sbert)
+        else:
+            train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
         completed_epoch = epoch + 1
 
         if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
-            evaluate(model, data, completed_epoch, args, writer)
+            if args.nl_semantic_supervision:
+                evaluate(model, data, completed_epoch, args, writer, sbert)
+            else:
+                evaluate(model, data, completed_epoch, args, writer)
 
         # Saving checkpoints.
         if args.save_logs:
