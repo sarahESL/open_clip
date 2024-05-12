@@ -413,7 +413,8 @@ def main(args):
         model = torch.compile(model)
 
     if args.nl_semantic_supervision:
-                sbert = SBERT('all-mpnet-base-v2')
+        #sbert = SBERT('all-mpnet-base-v2')
+        sbert = SBERT('all-MiniLM-L12-v2')
 
     if 'train' not in data:
         # If using int8, convert to inference mode.
