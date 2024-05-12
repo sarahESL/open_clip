@@ -311,10 +311,13 @@ class ClipInModalityLoss(nn.Module):
                 logscale_logits_image_text =  logscale_logits_image_text + logits_paired_text_image
 
         else:
-            inModality_loss = self.beta*((
-                F.cross_entropy(logits_per_image, labels) +
-                F.cross_entropy(logits_per_text, labels)
-                )/2)
+            logscale_logits_image = logit_scale * logits_per_image
+            logscale_logits_text = logit_scale * logits_per_text
+
+            inModality_loss = self.beta*(
+                F.cross_entropy(logscale_logits_image, labels) +
+                F.cross_entropy(logscale_logits_text, labels)
+                )
         
         clip_loss = self.alpha*((
             F.cross_entropy(logscale_logits_image_text, labels) +
