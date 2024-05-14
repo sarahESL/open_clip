@@ -5,11 +5,13 @@ OUTPATH=/home/sedigheh.eslami/outputs/alignCLIP_openCLIP/shared_transformer_proj
 BS=512
 LR=1e-3
 N_EPOCHS=30
-MODEL="ViT-L-16-384-dim"
-#MODEL="ViT-L-16"
+#MODEL="ViT-L-16-384-dim"
+MODEL="ViT-L-16"
 #MODEL="ViT-B-16"
 TRAIN_DATA="/home/sedigheh.eslami/datasets/cc12m/{00000..01242}.tar"
-PROJECT_NAME=open_clip_sharedParams_384Dim_CC12M_kisz
+#PROJECT_NAME=open_clip_sharedParams_384Dim_CC12M_kisz
+#PROJECT_NAME=open_clip_sharedParams_0.2Temperature_CC12M_kisz
+PROJECT_NAME=open_clip_sharedParams_0.01Temperature_CC12M_kisz
 
 wandb login $(cat ~/.wandb_secret)
 
