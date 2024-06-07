@@ -236,8 +236,8 @@ class CLIP(nn.Module):
         self.register_buffer('attn_mask', self.text.attn_mask, persistent=False)
 
         #self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.2))
-        #self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
-        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.01))
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+        #self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.01))
         self.init_parameters()
 
     def init_parameters(self):
