@@ -382,6 +382,12 @@ def parse_args(args):
         help="Notes if logging with wandb"
     )
     parser.add_argument(
+        "--wandb-dir",
+        default='',
+        type=str,
+        help="Path for wandb"
+    )
+    parser.add_argument(
         "--wandb-project-name",
         type=str,
         default='open-clip',

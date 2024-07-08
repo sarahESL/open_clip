@@ -408,6 +408,7 @@ def main(args):
             tags=[],
             resume='auto' if args.resume == "latest" else None,
             config=vars(args),
+            dir=args.wandb_dir,
         )
         if args.debug:
             wandb.watch(model, log='all')
@@ -419,8 +420,7 @@ def main(args):
         model = torch.compile(model)
 
     if args.nl_semantic_supervision:
-        #sbert = SBERT('all-mpnet-base-v2')
-        sbert = SBERT('all-MiniLM-L12-v2')
+        sbert = SBERT('all-mpnet-base-v2')
     
     if 'train' not in data:
         # If using int8, convert to inference mode.
