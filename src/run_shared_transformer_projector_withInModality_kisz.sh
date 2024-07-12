@@ -1,23 +1,24 @@
 #!/bin/bash
 
 
-OUTPATH=/home/sedigheh.eslami/outputs/alignCLIP_openCLIP/shared_transformer_projector_withInModality/logs
+OUTPATH=/raid/sedigheh.eslami/outputs/alignCLIP_openCLIP/shared_transformer_projector_withInModality/logs
 BS=512
 LR=1e-3
 N_EPOCHS=30
 #MODEL="ViT-L-16-384-dim"
 #MODEL="ViT-L-16"
 #MODEL="ViT-B-16"
-MODEL="ViT-XL-16"
+#MODEL="ViT-XL-16"
+MODEL="ViT-S-16"
 TRAIN_DATA="/raid/sedigheh.eslami/datasets/cc12m/cc12m/{00000..01242}.tar"
 #PROJECT_NAME=open_clip_sharedParams_withInModality_384D_CC12M_kisz
 #PROJECT_NAME=open_clip_sharedParams_withInModality_0.2Temperature_CC12M_kisz
 #PROJECT_NAME=open_clip_sharedParams_withInModality_0.01Temperature_CC12M_kisz
 #PROJECT_NAME=open_clip_sharedParams_withInModality_ViTB_CC12M_kisz
-PROJECT_NAME=open_clip_sharedParams_withInModality_ViTXL_CC12M_kisz
+PROJECT_NAME=open_clip_sharedParams_withInModality_CC12M_kisz
 WANDBDIR=/raid/sedigheh.eslami/outputs/wandb
 ALPHA=1
-BETA=0.75
+BETA=0.5
 
 wandb login $(cat ~/.wandb_secret)
 
