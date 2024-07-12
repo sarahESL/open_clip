@@ -59,7 +59,7 @@ def backward(total_loss, scaler):
         total_loss.backward()
 
 
-def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=None):
+def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=None, pretrained_semantic_encoder=None):
     device = torch.device(args.device)
     autocast = get_autocast(args.precision)
     input_dtype = get_input_dtype(args.precision)
@@ -87,8 +87,14 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
 
         if not args.skip_scheduler:
             scheduler(step)
+        if args.soft_loss:
+            images, texts, captions = batch
+            semantic_features = pretrained_semantic_encoder.encode(sentences=captions, show_progress_bar=False)
+            semantic_features = torch.from_numpy(semantic_features)
+            semantic_features = semantic_features.to(device=device, non_blocking=True)
+        else:
+            images, texts = batch
 
-        images, texts = batch
         images = images.to(device=device, dtype=input_dtype, non_blocking=True)
         texts = texts.to(device=device, non_blocking=True)
 
@@ -103,7 +109,10 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
                     with torch.no_grad():
                         dist_model_out = dist_model(images, texts)
                     model_out.update({f'dist_{k}' : v for k, v in dist_model_out.items()})
-                losses = loss(**model_out, output_dict=True)
+                if args.soft_loss:
+                    losses = loss(**model_out, output_dict=True, semantic_features=semantic_features)
+                else:
+                    losses = loss(**model_out, output_dict=True)
 
                 total_loss = sum(losses.values())
                 losses["loss"] = total_loss
@@ -233,7 +242,7 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
     # end for
 
 
-def evaluate(model, data, epoch, args, tb_writer=None):
+def evaluate(model, data, loss, epoch, args, tb_writer=None, pretrained_semantic_encoder=None):
     metrics = {}
     if not is_master(args):
         return metrics
@@ -258,7 +267,13 @@ def evaluate(model, data, epoch, args, tb_writer=None):
         all_image_features, all_text_features = [], []
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
-                images, texts = batch
+                if args.soft_loss:
+                    images, texts, captions = batch
+                    semantic_features = pretrained_semantic_encoder.encode(sentences=captions, show_progress_bar=False)
+                    semantic_features = torch.from_numpy(semantic_features)
+                    semantic_features = semantic_features.to(device=device, non_blocking=True)
+                else:
+                    images, texts = batch
                 images = images.to(device=device, dtype=input_dtype, non_blocking=True)
                 texts = texts.to(device=device, non_blocking=True)
 
@@ -276,11 +291,10 @@ def evaluate(model, data, epoch, args, tb_writer=None):
                     logits_per_text = logits_per_image.t()
 
                     batch_size = images.shape[0]
-                    labels = torch.arange(batch_size, device=device).long()
-                    total_loss = (
-                        F.cross_entropy(logits_per_image, labels) +
-                        F.cross_entropy(logits_per_text, labels)
-                    ) / 2
+                    if args.soft_loss:
+                        total_loss = loss(**model_out, output_dict=False, semantic_features=semantic_features)  
+                    else:
+                        total_loss = loss(**model_out, output_dict=False)
 
                     gen_loss = maybe_compute_generative_loss(model_out)
 

@@ -26,11 +26,23 @@ class ParseKwargs(argparse.Action):
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--align",
-        action="store_true",
-        default=False,
-        help="If True, adds an adaptation layer to project text and vision embeddings into the same space.",
-    )
+            "--soft-loss",
+            action="store_true",
+            default=False,
+            help="If True, calculates the soft contrastive loss.",
+            )
+    parser.add_argument(
+            "--nl-semantic-supervision",
+            type=str,
+            default='sbert',
+            help="Choice of the pre-trained semantic text encoder. Default set to sbert"
+            )
+    parser.add_argument(
+            "--similarity-threshold",
+            type=float,
+            default=0.8,
+            help="Similarity threshold for grouping positive pairs."
+            )
     parser.add_argument(
         "--train-data",
         type=str,

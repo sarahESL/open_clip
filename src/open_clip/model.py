@@ -196,7 +196,6 @@ class CLIP(nn.Module):
             quick_gelu: bool = False,
             cast_dtype: Optional[torch.dtype] = None,
             output_dict: bool = False,
-            align: bool = False,
     ):
         super().__init__()
         self.output_dict = output_dict
@@ -213,11 +212,6 @@ class CLIP(nn.Module):
         self.register_buffer('attn_mask', text.attn_mask, persistent=False)
 
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
-
-        if align:
-            out_dim = int(embed_dim / 2)
-            self.adapter = Adapter(embed_dim, out_dim)
-        self.align = align
 
     def lock_image_tower(self, unlocked_groups=0, freeze_bn_stats=False):
         # lock image tower as per LiT - https://arxiv.org/abs/2111.07991
@@ -253,10 +247,6 @@ class CLIP(nn.Module):
     ):
         image_features = self.encode_image(image, normalize=True) if image is not None else None
         text_features = self.encode_text(text, normalize=True) if text is not None else None
-
-        if self.align:
-            image_features = self.adapter(image_features)
-            text_features = self.adapter(text_features)
 
         if self.output_dict:
             return {

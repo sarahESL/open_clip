@@ -36,6 +36,8 @@ from training.scheduler import cosine_lr, const_lr, const_lr_cooldown
 from training.train import train_one_epoch, evaluate
 from training.file_utils import pt_load, check_exists, start_sync_process, remote_sync
 
+from sentence_transformers import SentenceTransformer as SBERT
+
 
 LATEST_CHECKPOINT_NAME = "epoch_latest.pt"
 
@@ -89,6 +91,7 @@ def main(args):
         if args.distributed:
             # sync date_str from master to all ranks
             date_str = broadcast_object(args, date_str)
+
         args.name = '-'.join([
             date_str,
             f"model_{model_name_safe}",
@@ -98,6 +101,8 @@ def main(args):
             f"p_{args.precision}",
         ])
 
+        if args.soft_loss:
+             args.name = '-'.join([args.name, f"sim_theta_{args.similarity_threshold}"])
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
     args.log_path = None
@@ -196,9 +201,6 @@ def main(args):
         logging.info(
             f'Running in horovod mode with multiple processes / nodes. Device: {args.device}.'
             f'Process (global: {args.rank}, local {args.local_rank}), total {args.world_size}.')
-    if args.align:
-        logging.info(
-            f'Embedding alignment is set.')
     elif args.distributed:
         logging.info(
             f'Running in distributed mode with multiple processes. Device: {args.device}.'
@@ -233,7 +235,6 @@ def main(args):
         image_std=args.image_std,
         aug_cfg=args.aug_cfg,
         output_dict=True,
-        align=args.align
     )
     if args.distill:
         # FIXME: currenlty assumes the model your distilling from has the same tokenizer & transforms.
@@ -243,7 +244,6 @@ def main(args):
             device=device,
             precision=args.precision,
             output_dict=True,
-            align=args.align
         )
     if args.use_bnb_linear is not None:
         print('=> using a layer from bitsandbytes.\n'
@@ -350,7 +350,7 @@ def main(args):
             logging.info(f"=> loaded checkpoint '{args.resume}' (epoch {start_epoch})")
 
     # initialize datasets
-    data = get_data(args, (preprocess_train, preprocess_val), epoch=start_epoch, tokenizer=get_tokenizer(args.model))
+    data = get_data(args, (preprocess_train, preprocess_val), epoch=start_epoch, tokenizer=get_tokenizer(args.model), nl_semantic_supervision=args.nl_semantic_supervision)
     assert len(data), 'At least one train or eval dataset must be specified.'
 
     # create scheduler if train
@@ -405,26 +405,42 @@ def main(args):
         logging.info('Compiling model...')
         model = torch.compile(model)
 
+    if args.nl_semantic_supervision:
+        sbert = SBERT('all-mpnet-base-v2')
+        
+    loss = create_loss(args)
+
     if 'train' not in data:
         # If using int8, convert to inference mode.
         if args.use_bnb_linear is not None:
             from open_clip.utils import convert_int8_model_to_inference_mode
             convert_int8_model_to_inference_mode(model)
         # Evaluate.
-        evaluate(model, data, start_epoch, args, writer)
+        if args.soft_loss:
+            evaluate(model, data, loss, start_epoch, args, writer, sbert)
+        else:
+            evaluate(model, data, loss, start_epoch, args, writer)
         return
 
-    loss = create_loss(args)
+
+    if args.nl_semantic_supervision:
+        evaluate(model, data, loss, start_epoch, args, writer, sbert)
 
     for epoch in range(start_epoch, args.epochs):
         if is_master(args):
             logging.info(f'Start epoch {epoch}')
 
-        train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
+        if args.soft_loss:
+            train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer, pretrained_semantic_encoder=sbert)
+        else:
+            train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
         completed_epoch = epoch + 1
 
         if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
-            evaluate(model, data, completed_epoch, args, writer)
+            if args.nl_semantic_supervision:
+                evaluate(model, data, loss, start_epoch, args, writer, sbert)
+            else:
+                evaluate(model, data, completed_epoch, args, writer)
 
         # Saving checkpoints.
         if args.save_logs:
