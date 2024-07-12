@@ -1,15 +1,14 @@
 #!/bin/bash
 
 
-OUTPATH=/home/sedigheh.eslami/outputs/alignCLIP_openCLIP/logs
+OUTPATH=/raid/sedigheh.eslami/outputs/alignCLIP_openCLIP/logs
 BS=512
 LR=1e-3
 N_EPOCHS=30
 #MODEL="ViT-L-16-modified"
-MODEL="ViT-XL-16"
-TRAIN_DATA="/home/sedigheh.eslami/datasets/cc12m/{00000..01242}.tar"
-IMAGENET="/home/sedigheh.eslami/datasets/imagenet_1k"
-IMAGENETV2="/home/sedigheh.eslami/datasets/cc12m"
+#MODEL="ViT-XL-16"
+MODEL="ViT-S-16"
+TRAIN_DATA="/raid/sedigheh.eslami/datasets/cc12m/cc12m/{00000..01242}.tar"
 PROJECT_NAME=open_clip_CC12M_kisz
 
 wandb login $(cat ~/.wandb_secret)
