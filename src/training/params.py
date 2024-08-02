@@ -56,6 +56,12 @@ def parse_args(args):
         help="If True, uses pre-trained sentence embeddings to supervise the text embeddings."
     )
     parser.add_argument(
+        "--rescale_ablation",
+        action="store_true",
+        default=False,
+        help="If True, deactivate the sbert-rescaling in intra-modality separation."
+    )
+    parser.add_argument(
         "--semantic_pairwise",
         action="store_true",
         default=False,

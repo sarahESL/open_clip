@@ -178,6 +178,7 @@ class ClipInModalityLoss(nn.Module):
             epoch=1,
             nl_semantic_supervision=False,
             semantic_weight=1.0,
+            rescale_ablation=False,
             rescale_clip=False,
             separate_text=True,
             separate_image=False
@@ -201,6 +202,7 @@ class ClipInModalityLoss(nn.Module):
             self.beta = beta
         
         self.nl_semantic_supervision = nl_semantic_supervision
+        self.rescale_ablation = rescale_ablation
         self.rescale_clip = rescale_clip
         self.separate_text = separate_text
         self.separate_image = separate_image
@@ -286,12 +288,22 @@ class ClipInModalityLoss(nn.Module):
             logits_paired_text_image = torch.mul(logits_image_text, torch.eye(size).to(device))
 
             if self.separate_text:
-                logits_per_text = torch.mul(logits_per_text, semantic_sim)
+                if self.rescale_ablation:
+                    hollow_matrix = torch.ones((size, size)) - torch.eye(size)
+                    hollow_matrix = hollow_matrix.to(device)
+                    logits_per_text = torch.mul(logits_per_text, hollow_matrix)
+                else:
+                    logits_per_text = torch.mul(logits_per_text, semantic_sim)
                 logits_per_text = logits_per_text + logits_paired_text_image
                 logscale_logits_per_text = logit_scale * logits_per_text
 
             if self.separate_image:
-                logits_per_image = torch.mul(logits_per_image, semantic_sim)
+                if self.rescale_ablation:
+                    hollow_matrix = torch.ones((size, size)) - torch.eye(size)
+                    hollow_matrix = hollow_matrix.to(device)
+                    logits_per_image = torch.mul(logits_per_image, hollow_matrix)
+                else:
+                    logits_per_image = torch.mul(logits_per_image, semantic_sim)
                 logits_per_image = logits_per_image + logits_paired_text_image
                 logscale_logits_per_image = logit_scale * logits_per_image
 

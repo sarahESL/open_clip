@@ -298,6 +298,7 @@ def create_loss(args, epoch):
                 epoch=epoch,
                 nl_semantic_supervision=args.nl_semantic_supervision,
                 semantic_weight=args.semantic_weight,
+                rescale_ablation=args.rescale_ablation,
                 rescale_clip=args.rescale_clip,
                 separate_text=args.separate_text,
                 separate_image=args.separate_image

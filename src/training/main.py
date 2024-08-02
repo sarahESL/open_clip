@@ -109,7 +109,10 @@ def main(args):
             args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}", f"rescaleCLIP_{args.rescale_clip}"])
         elif args.nl_semantic_supervision:
             #args.name = '-'.join([args.name, f"pairwise_{args.semantic_pairwise}", f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}", f"II_{args.separate_image}"])
-            args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}", f"II_{args.separate_image}"])
+            if args.rescale_ablation:
+                args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}", f"II_{args.separate_image}", "rescale_ablation"])
+            else:
+                args.name = '-'.join([args.name, f"alpha_{args.alpha}", f"semantic_{args.semantic_weight}", f"II_{args.separate_image}"])
 
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
