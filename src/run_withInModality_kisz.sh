@@ -1,18 +1,19 @@
 #!/bin/bash
 
 
-OUTPATH=/home/sedigheh.eslami/outputs/alignCLIP_openCLIP/withInModality/logs
+OUTPATH=/raid/sedigheh.eslami/outputs/alignCLIP_openCLIP/withInModality/logs
 BS=512
 LR=1e-3
 N_EPOCHS=30
 MODEL="ViT-L-16-modified"
 #MODEL="ViT-L-16-384dim"
 #MODEL="ViT-B-16"
-TRAIN_DATA="/home/sedigheh.eslami/datasets/cc12m/{00000..01242}.tar"
-PROJECT_NAME=open_clip_withInModality_CC12M_kisz
+TRAIN_DATA="/raid/sedigheh.eslami/datasets/cc12m/cc12m/{00000..01242}.tar"
+PROJECT_NAME=open_clip_withInModality_IIonly_CC12M_kisz
 #PROJECT_NAME=open_clip_sharedParams_withInModality_CC12M_kisz_distributed
+WANDBDIR=/raid/sedigheh.eslami/outputs/wandb
 ALPHA=1
-BETA=0.5
+BETA=0.25
 
 wandb login $(cat ~/.wandb_secret)
 

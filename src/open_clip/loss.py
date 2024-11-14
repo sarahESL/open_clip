@@ -216,7 +216,8 @@ class ClipInModalityLoss(nn.Module):
 
         if semantic_features is not None:
             logits_per_image_text, logits_per_text_image, logits_per_image, logits_per_text = self.get_logits(image_features, text_features, logit_scale, semantic_features=semantic_features)
-            IMSep_loss = self.beta * (F.cross_entropy(logits_per_image, labels) + F.cross_entropy(logits_per_text, labels))
+            #IMSep_loss = self.beta * (F.cross_entropy(logits_per_image, labels) + F.cross_entropy(logits_per_text, labels))
+            IMSep_loss = self.beta * (F.cross_entropy(logits_per_image, labels))
         else:
             logits_per_image_text, logits_per_text_image = self.get_logits(image_features, text_features, logit_scale)
 
