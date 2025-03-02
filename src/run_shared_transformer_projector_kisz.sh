@@ -25,8 +25,8 @@ WANDBDIR=/raid/sedigheh.eslami/outputs/wandb
 
 wandb login $(cat ~/.wandb_secret)
 
-python -m training.main --logs=$OUTPATH --save-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --train-num-samples 10030127 --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --precision amp --dataset-type webdataset
-#python -m training.main --logs=$OUTPATH --save-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --train-num-samples 10030127 --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --precision amp --dataset-type webdataset --resume "/home/sedigheh.eslami/outputs/alignCLIP_openCLIP/shared_transformer_projector/logs/2024_06_07-12_59_49-model_ViT-XL-16-lr_0.001-b_512-j_2-p_amp/checkpoints/epoch_28.pt"
+#python -m training.main --logs=$OUTPATH --save-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --train-num-samples 10030127 --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --precision amp --dataset-type webdataset
+python -m training.main --logs=$OUTPATH --save-frequency 2 --report-to wandb --wandb-project-name=$PROJECT_NAME --train-data=$TRAIN_DATA --train-num-samples 10030127 --warmup 10000  --batch-size=$BS --lr=$LR --wd=0.1 --epochs=$N_EPOCHS --workers=2 --model $MODEL --precision amp --dataset-type webdataset --resume "/raid/sedigheh.eslami/outputs/alignCLIP_openCLIP/shared_transformer_projector/logs/2024_11_13-13_13_58-model_ViT-M-16-lr_0.001-b_512-j_2-p_amp/checkpoints/epoch_18.pt"
 
 ########################CC3M
 
